@@ -17,7 +17,7 @@ Humanoid.Died:Connect(function()
 			a2.CFrame = joint.C1
 			socket.LimitsEnabled = true
 			socket.TwistLimitsEnabled = true
-			joint:Destroy()
+			joint:Destroy()		
 		end
 	end
-end)
+end
