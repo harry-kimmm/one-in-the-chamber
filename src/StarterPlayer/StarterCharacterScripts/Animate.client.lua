@@ -479,30 +479,7 @@ function move(time)
 	end
 
 	-- Tool Animation handling
-	local tool = getTool()
-	if tool and tool:FindFirstChild("Handle") then
-	
-		local animStringValueObject = getToolAnim(tool)
 
-		if animStringValueObject then
-			toolAnim = animStringValueObject.Value
-			-- message recieved, delete StringValue
-			animStringValueObject.Parent = nil
-			toolAnimTime = time + .3
-		end
-
-		if time > toolAnimTime then
-			toolAnimTime = 0
-			toolAnim = "None"
-		end
-
-		animateTool()		
-	else
-		stopToolAnimations()
-		toolAnim = "None"
-		toolAnimInstance = nil
-		toolAnimTime = 0
-	end
 end
 
 -- connect events
