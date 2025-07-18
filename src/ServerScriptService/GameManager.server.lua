@@ -15,8 +15,8 @@ local MAP_SPAWNS    = workspace:WaitForChild("Map"):WaitForChild("SpawnPoints")
 
 local MIN_PLAYERS = 1
 local LOBBY_TIME  = 1
-local ROUND_TIME  = 60
-local KILL_LIMIT  = 5
+local ROUND_TIME  = 300
+local KILL_LIMIT  = 10
 
 local currentPhase = "None"
 
