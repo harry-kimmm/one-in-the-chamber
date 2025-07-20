@@ -1,4 +1,8 @@
 -- StarterPlayerScripts/ShiftLockController.lua
+
+-- Debug startup
+print("[ShiftLock] Controller loaded")
+
 local Players       = game:GetService("Players")
 local UIS           = game:GetService("UserInputService")
 local RunService    = game:GetService("RunService")
@@ -12,13 +16,14 @@ local StartLobby    = remotes:WaitForChild("StartLobby")
 
 local active = false
 
--- Safely unbind any old ShiftLock step
+-- Safely unbind any existing ShiftLock binding
 local function clearBinding()
 	pcall(function()
 		RunService:UnbindFromRenderStep("ShiftLock")
 	end)
 end
 
+-- Apply shift-lock to the given character
 local function applyShiftLock(char)
 	clearBinding()
 	local hum  = char:WaitForChild("Humanoid")
@@ -28,14 +33,13 @@ local function applyShiftLock(char)
 	hum.CameraOffset = Vector3.new(1.75, 0, 0)
 
 	RunService:BindToRenderStep("ShiftLock", Enum.RenderPriority.Camera.Value, function()
-		-- lock the mouse at center…
 		UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
-		-- …and rotate the root to face the camera’s Y angle
 		local _, y, _ = workspace.CurrentCamera.CFrame:ToEulerAnglesYXZ()
 		root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, y, 0)
 	end)
 end
 
+-- Remove shift-lock and restore defaults
 local function removeShiftLock()
 	clearBinding()
 	local char = player.Character
@@ -49,29 +53,29 @@ local function removeShiftLock()
 	UIS.MouseBehavior = Enum.MouseBehavior.Default
 end
 
--- Round events
+-- Handle round start
 BeginRound.OnClientEvent:Connect(function()
 	active = true
 	if player.Character then
-		-- slight delay to ensure camera is ready
 		task.defer(function() applyShiftLock(player.Character) end)
 	end
 end)
 
+-- Handle round end
 EndRound.OnClientEvent:Connect(function()
 	active = false
 	removeShiftLock()
 end)
 
+-- Handle lobby start
 StartLobby.OnClientEvent:Connect(function()
 	active = false
 	removeShiftLock()
 end)
 
--- Respawn handling
+-- Reapply on respawn if still in a round
 player.CharacterAdded:Connect(function(char)
 	if active then
-		-- once character fully loads, re‑apply ShiftLock
 		char:WaitForChild("HumanoidRootPart")
 		task.defer(function() applyShiftLock(char) end)
 	end

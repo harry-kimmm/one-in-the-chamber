@@ -23,13 +23,13 @@ local function updateAmmo()
 end
 
 -- INITIALIZE labels
-coinLbl.Text = "Coins: "..coinsVal.Value
+coinLbl.Text = ""..coinsVal.Value
 ammoLbl.Text = "Ammo: "..ammoVal.Value
 ammoLbl.Visible = false
 
 -- RESPOND to stat changes
 coinsVal.Changed:Connect(function(v)
-	coinLbl.Text = "Coins: "..v
+	coinLbl.Text = ""..v
 end)
 ammoVal.Changed:Connect(updateAmmo)
 
