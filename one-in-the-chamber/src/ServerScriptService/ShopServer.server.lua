@@ -1,4 +1,4 @@
-local RS       = game:GetService("ReplicatedStorage")
+ssssssssssssslocal RS       = game:GetService("ReplicatedStorage")
 local shop     = RS:WaitForChild("Shop")
 local remotes  = RS:WaitForChild("GameRemotes")
 local purchase = remotes:WaitForChild("PurchaseItem")
