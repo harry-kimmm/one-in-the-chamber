@@ -243,7 +243,12 @@ function playAnimation(animName, transitionTime, humanoid)
 	
 		-- load it to the humanoid; get AnimationTrack
 		currentAnimTrack = humanoid:LoadAnimation(anim)
-		currentAnimTrack.Priority = Enum.AnimationPriority.Core
+		if animName == "jump" then
+			currentAnimTrack.Priority = Enum.AnimationPriority.Action
+		else
+			currentAnimTrack.Priority = Enum.AnimationPriority.Core
+		end
+
 		 
 		-- play the animation
 		currentAnimTrack:Play(transitionTime)

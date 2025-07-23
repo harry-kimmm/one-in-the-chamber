@@ -1,131 +1,187 @@
--- StarterGui/ShopUI/ShopUI_Client.lua
+local Players         = game:GetService("Players")
+local RS              = game:GetService("ReplicatedStorage")
+local player          = Players.LocalPlayer
 
-local Players    = game:GetService("Players")
-local RS         = game:GetService("ReplicatedStorage")
-local player     = Players.LocalPlayer
+local remotes         = RS:WaitForChild("GameRemotes")
+local purchaseRemote  = remotes:WaitForChild("PurchaseItem")
+local equipRemote     = remotes:WaitForChild("EquipItem")
+local startLobbyEvt   = remotes:WaitForChild("StartLobby")
+local beginRoundEvt   = remotes:WaitForChild("BeginRound")
 
--- Remotes
-local remotes        = RS:WaitForChild("GameRemotes")
-local purchaseRemote = remotes:WaitForChild("PurchaseItem")
-local equipRemote    = remotes:WaitForChild("EquipItem")
-local startLobbyEvt  = remotes:WaitForChild("StartLobby")
-local beginRoundEvt  = remotes:WaitForChild("BeginRound")
+local shopFolder      = RS:WaitForChild("Shop")
+local templates       = RS:WaitForChild("ToolTemplates")
 
--- Shop data
-local shopFolder = RS:WaitForChild("Shop")
+local ui              = script.Parent
+local openBtn         = ui:WaitForChild("OpenShopButton")
+local shopFrame       = ui:WaitForChild("ShopFrame")
+local closeBtn        = shopFrame:WaitForChild("CloseButton")
+local rangedTab       = shopFrame:WaitForChild("RangedTab")
+local meleeTab        = shopFrame:WaitForChild("MeleeTab")
+local rangedList      = shopFrame:WaitForChild("RangedList")
+local meleeList       = shopFrame:WaitForChild("MeleeList")
+local itemTemplate    = shopFrame:WaitForChild("ItemTemplate")
+local details         = shopFrame:WaitForChild("DetailsFrame")
 
--- UI refs
-local ui         = script.Parent
-local openBtn    = ui:WaitForChild("OpenShopButton")
-local shopFrame  = ui:WaitForChild("ShopFrame")
-local closeBtn   = shopFrame:WaitForChild("CloseButton")
-local rangedTab  = shopFrame:WaitForChild("RangedTab")
-local meleeTab   = shopFrame:WaitForChild("MeleeTab")
-local rangedList = shopFrame:WaitForChild("RangedList")
-local meleeList  = shopFrame:WaitForChild("MeleeList")
+local inv             = player:WaitForChild("Inventory")
+local eqr             = player:WaitForChild("EquippedRanged")
+local eqm             = player:WaitForChild("EquippedMelee")
+local coins           = player:WaitForChild("Coins")
 
--- Player stats
-local inv   = player:WaitForChild("Inventory")
-local eqr   = player:WaitForChild("EquippedRanged")
-local eqm   = player:WaitForChild("EquippedMelee")
-local coins = player:WaitForChild("Coins")
+local rarityColor     = {
+	Basic     = Color3.fromRGB(200,200,200),
+	Common    = Color3.fromRGB(170,170,170),
+	Uncommon  = Color3.fromRGB(100,255,100),
+	Rare      = Color3.fromRGB(100,150,255),
+	Epic      = Color3.fromRGB(200,100,255),
+	Legendary = Color3.fromRGB(255,200,100),
+}
 
--- Flags so we only initialize once per lobby, and only close once per round
 local lobbyInitialized = false
-local roundClosed      = false
 
-local function clear(list)
-	for _, c in ipairs(list:GetChildren()) do
-		if c:IsA("TextButton") then c:Destroy() end
-	end
-end
-
-local function refreshList(cat, frame)
-	clear(frame)
-	-- default
-	local defaultName = (cat=="Ranged") and "Gun" or "Sword"
-	do
-		local btn = Instance.new("TextButton")
-		btn.Size, btn.Parent = UDim2.new(1,-4,0,30), frame
-		local isEq = (cat=="Ranged" and eqr.Value==defaultName)
-			or (cat=="Melee"  and eqm.Value==defaultName)
-		btn.Text = defaultName .. (isEq and " — Equipped" or " — Default")
-		btn.MouseButton1Click:Connect(function()
-			equipRemote:FireServer(cat, defaultName)
-		end)
-	end
-	-- cosmetics
-	for _, item in ipairs(shopFolder[cat]:GetChildren()) do
-		local cost = item:FindFirstChild("Cost") and item.Cost.Value or 0
-		local owned= inv:FindFirstChild(item.Name)
-		local btn  = Instance.new("TextButton")
-		btn.Size, btn.Parent = UDim2.new(1,-4,0,30), frame
-		local isEq = (cat=="Ranged" and eqr.Value==item.Name)
-			or (cat=="Melee"  and eqm.Value==item.Name)
-		if owned and owned.Value then
-			btn.Text = item.Name .. (isEq and " — Equipped" or " — Owned")
-			btn.MouseButton1Click:Connect(function()
-				equipRemote:FireServer(cat, item.Name)
-			end)
-		else
-			btn.Text = item.Name.." — "..cost.."c"
-			btn.MouseButton1Click:Connect(function()
-				purchaseRemote:FireServer(cat, item.Name)
-			end)
+local function clearList(frame)
+	for _, c in ipairs(frame:GetChildren()) do
+		if c:IsA("TextButton") and c ~= itemTemplate then
+			c:Destroy()
 		end
 	end
 end
 
-purchaseRemote.OnClientEvent:Connect(function(ok,msg)
-	if ok then
-		refreshList("Ranged", rangedList)
-		refreshList("Melee",  meleeList)
-	else
-		warn("Purchase failed:", msg)
+local clickConn
+local function buildCategory(category, container)
+	clearList(container)
+	local folder = shopFolder:FindFirstChild(category)
+	if not folder then return end
+
+	local items = folder:GetChildren()
+	table.sort(items, function(a, b)
+		local aCost = a:FindFirstChild("Cost") and a.Cost.Value or 0
+		local bCost = b:FindFirstChild("Cost") and b.Cost.Value or 0
+		return aCost < bCost
+	end)
+
+	for _, shopItem in ipairs(items) do
+		local name     = shopItem.Name
+		local template = templates:FindFirstChild(name)
+		if not template then continue end
+
+		local btn = itemTemplate:Clone()
+		btn.Name    = name
+		btn.Visible = true
+		btn.Parent  = container
+
+		local rar = template:FindFirstChild("Rarity") and template.Rarity.Value or "Basic"
+		btn.BackgroundColor3 = rarityColor[rar] or rarityColor.Basic
+
+		local img    = btn:WaitForChild("PreviewImage")
+		local iconId = template:FindFirstChild("IconID")
+		img.Image    = iconId and "rbxassetid://"..iconId.Value or ""
+
+		btn:WaitForChild("NameLabel").Text = name
+
+		btn.MouseButton1Click:Connect(function()
+			details.Visible = true
+
+			local bigImg         = details:WaitForChild("BigImage")
+			bigImg.Image        = iconId and "rbxassetid://"..iconId.Value or ""
+			details:WaitForChild("ItemName"   ).Text = name
+			details:WaitForChild("Description").Text = template:FindFirstChild("Description") and template.Description.Value or ""
+
+			local actionBtn       = details:WaitForChild("ActionButton")
+			local actionTextLabel = actionBtn:WaitForChild("TextLabel")
+			if clickConn then clickConn:Disconnect() end
+
+			if inv:FindFirstChild(name) then
+				local equipped = (category=="Ranged" and eqr.Value) or eqm.Value
+				if equipped == name then
+					actionTextLabel.Text = "Equipped"
+					actionBtn.Active     = false
+				else
+					actionTextLabel.Text = "Equip"
+					actionBtn.Active     = true
+					clickConn            = actionBtn.MouseButton1Click:Connect(function()
+						equipRemote:FireServer(category, name)
+						actionTextLabel.Text = "Equipped"
+						actionBtn.Active     = false
+					end)
+				end
+			else
+				local cost = shopItem:FindFirstChild("Cost") and shopItem.Cost.Value or 0
+				actionTextLabel.Text = "Buy ("..cost.."c)"
+				actionBtn.Active     = true
+				clickConn            = actionBtn.MouseButton1Click:Connect(function()
+					-- purchase AND immediately equip
+					purchaseRemote:FireServer(category, name)
+					equipRemote:FireServer(category, name)
+					actionTextLabel.Text = "Equipped"
+					actionBtn.Active     = false
+				end)
+			end
+		end)
 	end
-end)
+end
 
-equipRemote.OnClientEvent:Connect(function(ok,cat)
-	if not ok then return end
-	refreshList(cat, (cat=="Ranged" and rangedList or meleeList))
-end)
-
--- tabs
-rangedTab.MouseButton1Click:Connect(function()
-	rangedList.Visible, meleeList.Visible = true, false
-end)
-meleeTab.MouseButton1Click:Connect(function()
-	rangedList.Visible, meleeList.Visible = false, true
-end)
-
--- open/close buttons
 openBtn.MouseButton1Click:Connect(function()
-	shopFrame.Visible, openBtn.Visible = true, false
+	buildCategory("Ranged", rangedList)
+	buildCategory("Melee",  meleeList)
+	shopFrame.Visible = true
+	openBtn.Visible   = false
 end)
+
 closeBtn.MouseButton1Click:Connect(function()
-	shopFrame.Visible, openBtn.Visible = false, true
+	shopFrame.Visible = false
+	openBtn.Visible   = true
 end)
 
--- only initialize shop on the very first lobby tick
-startLobbyEvt.OnClientEvent:Connect(function(_)
-	if lobbyInitialized then return end
-	lobbyInitialized = true
-	roundClosed      = false
-
-	openBtn.Visible   = true
-	shopFrame.Visible = false
-
-	refreshList("Ranged", rangedList)
-	refreshList("Melee",  meleeList)
+rangedTab.MouseButton1Click:Connect(function()
 	rangedList.Visible = true
 	meleeList.Visible  = false
 end)
 
--- only close shop once at the moment the round actually begins
-beginRoundEvt.OnClientEvent:Connect(function()
-	if roundClosed then return end
-	shopFrame.Visible, openBtn.Visible = false, false
-	roundClosed = true
-	-- reset lobby flag so next match will re-open
-	lobbyInitialized = false
+meleeTab.MouseButton1Click:Connect(function()
+	rangedList.Visible = false
+	meleeList.Visible  = true
 end)
+
+startLobbyEvt.OnClientEvent:Connect(function()
+	if not lobbyInitialized then
+		lobbyInitialized   = true
+		buildCategory("Ranged", rangedList)
+		buildCategory("Melee",  meleeList)
+		openBtn.Visible    = true
+		shopFrame.Visible  = false
+	end
+end)
+
+beginRoundEvt.OnClientEvent:Connect(function()
+	lobbyInitialized   = false
+	shopFrame.Visible  = false
+	openBtn.Visible    = false
+end)
+
+purchaseRemote.OnClientEvent:Connect(function(ok, itemName)
+	if not ok then return end
+	if itemName and not inv:FindFirstChild(itemName) then
+		local v = Instance.new("BoolValue")
+		v.Name   = itemName
+		v.Value  = true
+		v.Parent = inv
+	end
+	buildCategory("Ranged", rangedList)
+	buildCategory("Melee",  meleeList)
+end)
+
+equipRemote.OnClientEvent:Connect(function(ok, category, itemName)
+	if not ok then return end
+	if itemName then
+		if category == "Ranged" then
+			eqr.Value = itemName
+		else
+			eqm.Value = itemName
+		end
+	end
+	buildCategory(category, category == "Ranged" and rangedList or meleeList)
+end)
+
+-- initial render
+buildCategory("Ranged", rangedList)
+buildCategory("Melee",  meleeList)
