@@ -15,8 +15,8 @@ local HUB_SPAWNS      = workspace:WaitForChild("Hub"):WaitForChild("SpawnPoints"
 local MAPS_FOLDER     = workspace:WaitForChild("Maps")
 
 local MIN_PLAYERS     = 1
-local LOBBY_TIME      = 10
-local ROUND_TIME      = 5
+local LOBBY_TIME      = 20
+local ROUND_TIME      = 2
 local KILL_LIMIT      = 10
 
 local currentPhase     = "None"
@@ -55,7 +55,7 @@ local function giveLoadout(player)
 	for _, key in ipairs({"EquippedRanged", "EquippedMelee"}) do
 		local name = player:FindFirstChild(key) and player[key].Value
 		if name then
-			local tmpl = toolTemplates:FindFirstChild(name)
+			local tmpl = toolTemplates:FindFirstChild(name, true)
 			if tmpl then
 				tmpl:Clone().Parent = player.Backpack
 			end
