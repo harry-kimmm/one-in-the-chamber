@@ -16,7 +16,7 @@ local MAPS_FOLDER     = workspace:WaitForChild("Maps")
 
 local MIN_PLAYERS     = 1
 local LOBBY_TIME      = 5
-local ROUND_TIME      = 10
+local ROUND_TIME      = 60
 local KILL_LIMIT      = 10
 
 local currentPhase     = "None"

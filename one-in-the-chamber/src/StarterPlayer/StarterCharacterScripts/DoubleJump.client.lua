@@ -1,7 +1,7 @@
 local UserInputService = game:GetService("UserInputService")
 local player            = game:GetService("Players").LocalPlayer
 local MAX_JUMPS         = 2
-local ANIMATION_ID      = "rbxassetid://131389514455185" 
+local ANIMATION_ID      = "rbxassetid://80222769198825" 
 
 local function setupCharacter(char)
 	local humanoid  = char:WaitForChild("Humanoid")
