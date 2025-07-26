@@ -1,14 +1,11 @@
 -- StarterCharacterScripts/Sliding.lua
-
 local UIS       = game:GetService("UserInputService")
-local char      = script.Parent     -- this lives under StarterCharacterScripts, so on spawn it's the character
+local char      = script.Parent
 local anim      = Instance.new("Animation")
 anim.AnimationId = script:WaitForChild("SlideAnim").AnimationId
-
 local key       = Enum.KeyCode.C
 local ok        = true
 
--- helper: find your Sword tool by looking for SwordClient.lua under it
 local function getMeleeTool()
 	local player = game.Players.LocalPlayer
 	for _, tool in ipairs(player.Backpack:GetChildren()) do
@@ -27,7 +24,6 @@ UIS.InputBegan:Connect(function(input, processed)
 	if processed or not ok then return end
 	if input.KeyCode == key then
 		ok = false
-
 		local meleeTool = getMeleeTool()
 		if meleeTool then meleeTool.Enabled = false end
 
@@ -48,9 +44,9 @@ UIS.InputBegan:Connect(function(input, processed)
 		track:Stop()
 		v:Destroy()
 
-		wait(1)  -- slide cooldown
-		ok = true
-
 		if meleeTool then meleeTool.Enabled = true end
+
+		wait(1)
+		ok = true
 	end
 end)

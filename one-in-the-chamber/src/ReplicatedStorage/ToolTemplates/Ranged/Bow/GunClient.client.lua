@@ -13,8 +13,8 @@ local Mouse  = player:GetMouse()
 local ammoVal = player:WaitForChild("Ammo")
 
 local fxFolder     = RS:WaitForChild("Effects")
-local muzzleEffects = fxFolder:WaitForChild("MuzzleFlash")
-local beamEffects   = fxFolder:WaitForChild("NoTracer")
+local muzzleEffects = fxFolder:WaitForChild("NoFlash")
+local beamEffects   = fxFolder:WaitForChild("ArrowTracer")
 
 local handle            = tool:WaitForChild("Handle")
 local muzzleAttachment  = handle:WaitForChild("MuzzleAttachment")
@@ -104,7 +104,6 @@ tool.Activated:Connect(function()
 		if template:IsA("Beam") then
 			local beam = template:Clone()
 			beam.Parent = workspace      
-			beam.Attachment0 = muzzleAttachment
 
 			local dir = (Mouse.Hit.Position - muzzleAttachment.WorldPosition).Unit
 			local dist = math.min(MAX_RANGE, (Mouse.Hit.Position - muzzleAttachment.WorldPosition).Magnitude)
@@ -113,7 +112,8 @@ tool.Activated:Connect(function()
 			local endAttachment = Instance.new("Attachment")
 			endAttachment.Parent = workspace
 			endAttachment.WorldPosition = endPos
-			beam.Attachment1 = endAttachment
+			beam.Attachment0 = endAttachment
+			beam.Attachment1 = muzzleAttachment
 
 			local flashTime = 0.05
 			delay(flashTime, function()

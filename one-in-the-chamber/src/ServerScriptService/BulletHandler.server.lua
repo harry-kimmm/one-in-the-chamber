@@ -33,7 +33,7 @@ fireEvent.OnServerEvent:Connect(function(player, targetPos)
 			hum.Health = 0
 
 			player.leaderstats.Kills.Value += 1
-			player.Coins.Value             += 10
+			player.Coins.Value             += 3
 
 			ammo.Value += 1
 			grantEvent:FireClient(player)

@@ -15,7 +15,7 @@ local HUB_SPAWNS      = workspace:WaitForChild("Hub"):WaitForChild("SpawnPoints"
 local MAPS_FOLDER     = workspace:WaitForChild("Maps")
 
 local MIN_PLAYERS     = 1
-local LOBBY_TIME      = 5
+local LOBBY_TIME      = 60
 local ROUND_TIME      = 60
 local KILL_LIMIT      = 10
 
@@ -148,7 +148,7 @@ local function startRound()
 	for _, pl in ipairs(Players:GetPlayers()) do
 		local ammo = pl:FindFirstChild("Ammo")
 		if ammo then
-			ammo.Value = 1
+			ammo.Value = 1001
 		end
 
 		if pl.Character then
@@ -216,7 +216,7 @@ while true do
 		end
 
 		for _, pl in ipairs(Players:GetPlayers()) do
-			pl.Coins.Value += (pl.Name == winner and 5000 or 50)
+			pl.Coins.Value += (pl.Name == winner and 30 or 10)
 		end
 
 		broadcastAll(evEnd, winner or "")

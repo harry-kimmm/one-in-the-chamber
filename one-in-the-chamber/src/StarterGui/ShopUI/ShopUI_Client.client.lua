@@ -39,12 +39,12 @@ local eqRngVal = pl:WaitForChild("EquippedRanged")
 local eqMelVal = pl:WaitForChild("EquippedMelee")
 
 local rc = {
-	Basic=Color3.fromRGB(200,200,200),
+	Basic=Color3.fromRGB(38, 38, 38),
 	Common=Color3.fromRGB(170,170,170),
-	Uncommon=Color3.fromRGB(100,255,100),
-	Rare=Color3.fromRGB(100,150,255),
-	Epic=Color3.fromRGB(200,100,255),
-	Legendary=Color3.fromRGB(255,200,100)
+	Uncommon=Color3.fromRGB(57, 255, 103),
+	Rare=Color3.fromRGB(58, 120, 255),
+	Epic=Color3.fromRGB(176, 19, 255),
+	Legendary=Color3.fromRGB(255, 186, 49)
 }
 
 

@@ -6,7 +6,7 @@ local meleeAttack = remotes:WaitForChild("MeleeAttack")
 local grantEvent  = remotes:WaitForChild("GrantBullet")
 
 local COOLDOWN  = 1.25
-local KILL_COINS= 10
+local KILL_COINS= 3
 
 -- simple per‑player debounce
 local lastSwing = {}

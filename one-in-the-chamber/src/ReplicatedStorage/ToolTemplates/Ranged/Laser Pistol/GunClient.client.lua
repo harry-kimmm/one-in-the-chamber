@@ -13,8 +13,8 @@ local Mouse  = player:GetMouse()
 local ammoVal = player:WaitForChild("Ammo")
 
 local fxFolder     = RS:WaitForChild("Effects")
-local muzzleEffects = fxFolder:WaitForChild("MuzzleFlash")
-local beamEffects   = fxFolder:WaitForChild("NoTracer")
+local muzzleEffects = fxFolder:WaitForChild("LazerMuzzleFlash")
+local beamEffects   = fxFolder:WaitForChild("LazerTracer")
 
 local handle            = tool:WaitForChild("Handle")
 local muzzleAttachment  = handle:WaitForChild("MuzzleAttachment")
