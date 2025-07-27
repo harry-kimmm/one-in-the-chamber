@@ -16,7 +16,7 @@ local MAPS_FOLDER     = workspace:WaitForChild("Maps")
 
 local MIN_PLAYERS     = 1
 local LOBBY_TIME      = 60
-local ROUND_TIME      = 60
+local ROUND_TIME      = 1
 local KILL_LIMIT      = 10
 
 local currentPhase     = "None"
@@ -216,7 +216,7 @@ while true do
 		end
 
 		for _, pl in ipairs(Players:GetPlayers()) do
-			pl.Coins.Value += (pl.Name == winner and 30 or 10)
+			pl.Coins.Value += (pl.Name == winner and 690000 or 10)
 		end
 
 		broadcastAll(evEnd, winner or "")
