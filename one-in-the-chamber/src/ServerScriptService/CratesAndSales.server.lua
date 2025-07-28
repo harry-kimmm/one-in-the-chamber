@@ -31,6 +31,7 @@ openCrate.OnServerEvent:Connect(function(player, crateName)
 	end
 	coins.Value -= costVal.Value
 
+	-- gather drop weights
 	local dropsFolder = crate:FindFirstChild("Drops")
 	if not dropsFolder then return end
 	local raw = dropsFolder:GetChildren()
@@ -44,6 +45,7 @@ openCrate.OnServerEvent:Connect(function(player, crateName)
 	local pick = weightedPick(drops)
 	local won  = pick.Name
 
+	-- always add a new BoolValue instance (duplicates allowed)
 	local inv = player:FindFirstChild("Inventory")
 	if inv then
 		local b = Instance.new("BoolValue",inv)
@@ -54,6 +56,7 @@ openCrate.OnServerEvent:Connect(function(player, crateName)
 		flag.Value = true
 	end
 
+	-- build full drop info for spinner
 	local out = {}
 	local cat = crateName:match("^(%a+)Crate$")
 	for _,d in ipairs(drops) do
@@ -70,31 +73,34 @@ openCrate.OnServerEvent:Connect(function(player, crateName)
 			Weight   = d.Weight,
 			Category = cat,
 			IconID   = icon,
-			Rarity   = rar
+			Rarity   = rar,
 		})
 	end
 
 	crateRes:FireClient(player,true,crateName,won,out)
 end)
 
-sellItem.OnServerEvent:Connect(function(player,itemName)
-	local inv = player:FindFirstChild("Inventory")
-	if not inv then
-		sellRes:FireClient(player,false,itemName,0)
+sellItem.OnServerEvent:Connect(function(player, itemInstance)
+	-- itemInstance is the BoolValue under Inventory
+	if typeof(itemInstance) ~= "Instance" or not itemInstance:IsA("BoolValue") then
+		sellRes:FireClient(player,false,nil,0)
 		return
 	end
-	local b = inv:FindFirstChild(itemName)
-	if not b or not b:FindFirstChild("FromCrate") then
-		sellRes:FireClient(player,false,itemName,0)
+	if itemInstance.Parent ~= player.Inventory or not itemInstance:FindFirstChild("FromCrate") then
+		sellRes:FireClient(player,false,itemInstance.Name,0)
 		return
 	end
+
+	local itemName = itemInstance.Name
 	local tmpl = templates.Ranged:FindFirstChild(itemName)
 		or templates.Melee:FindFirstChild(itemName)
 	local rar = tmpl and tmpl:FindFirstChild("Rarity") and tmpl.Rarity.Value or "Common"
 	local prices = {Common=50,Uncommon=125,Rare=450,Epic=750,Legendary=1000}
 	local price = prices[rar] or 0
+
 	local coins = player:FindFirstChild("Coins")
 	if coins then coins.Value += price end
-	b:Destroy()
+
+	itemInstance:Destroy()
 	sellRes:FireClient(player,true,itemName,price)
 end)

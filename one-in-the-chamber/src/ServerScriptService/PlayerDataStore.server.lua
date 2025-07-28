@@ -1,104 +1,109 @@
--- ServerScriptService/PlayerDataStore.lua
-
 local DataStoreService = game:GetService("DataStoreService")
 local Players          = game:GetService("Players")
+local playerStore      = DataStoreService:GetDataStore("PlayerData")
 
--- 1) your DataStore
-local playerStore = DataStoreService:GetDataStore("PlayerData")
-
--- 2) default values if no data exists
 local DEFAULT_DATA = {
-	coins           = 0,
-	inventory       = { Gun = true, Sword = true },
+	coins         = 0,
+	inventory     = { Gun = true, Sword = true },
 	equippedRanged  = "Gun",
 	equippedMelee   = "Sword",
+	wins          = 0,
+	lifetimeKills = 0,
 }
 
--- helper: safely load
 local function loadPlayerData(userId)
-	local success, data = pcall(function()
+	local ok, data = pcall(function()
 		return playerStore:GetAsync(tostring(userId))
 	end)
-	if success and type(data)=="table" then
-		-- fill missing fields from defaults
-		data.coins          = data.coins         or DEFAULT_DATA.coins
-		data.inventory      = data.inventory     or DEFAULT_DATA.inventory
-		data.equippedRanged = data.equippedRanged or DEFAULT_DATA.equippedRanged
-		data.equippedMelee  = data.equippedMelee  or DEFAULT_DATA.equippedMelee
+	if ok and type(data) == "table" then
+		data.coins         = data.coins         or DEFAULT_DATA.coins
+		data.inventory     = data.inventory     or DEFAULT_DATA.inventory
+		data.equippedRanged  = data.equippedRanged  or DEFAULT_DATA.equippedRanged
+		data.equippedMelee   = data.equippedMelee   or DEFAULT_DATA.equippedMelee
+		data.wins          = data.wins          or DEFAULT_DATA.wins
+		data.lifetimeKills = data.lifetimeKills or DEFAULT_DATA.lifetimeKills
 		return data
 	else
-		warn(string.format("[PlayerDataStore] couldn't load %d, using defaults", userId))
-		-- return a copy of defaults
 		return {
-			coins           = DEFAULT_DATA.coins,
-			inventory       = DEFAULT_DATA.inventory,
+			coins         = DEFAULT_DATA.coins,
+			inventory     = DEFAULT_DATA.inventory,
 			equippedRanged  = DEFAULT_DATA.equippedRanged,
 			equippedMelee   = DEFAULT_DATA.equippedMelee,
+			wins          = DEFAULT_DATA.wins,
+			lifetimeKills = DEFAULT_DATA.lifetimeKills,
 		}
 	end
 end
 
--- helper: safely save
 local function savePlayerData(userId, data)
-	local success, err = pcall(function()
+	pcall(function()
 		playerStore:SetAsync(tostring(userId), data)
 	end)
-	if not success then
-		warn(string.format("[PlayerDataStore] failed to save %d: %s", userId, err))
-	end
 end
 
--- when a player joins, load & apply
 local function onPlayerAdded(player)
 	local data = loadPlayerData(player.UserId)
 
-	-- ── leaderstats ──
-	local stats = Instance.new("Folder", player)
-	stats.Name = "leaderstats"
+	local statsFolder = Instance.new("Folder")
+	statsFolder.Name   = "leaderstats"
+	statsFolder.Parent = player
 
-	local kills = Instance.new("IntValue", stats)
-	kills.Name  = "Kills"
-	kills.Value = 0
+	local kills = Instance.new("IntValue")
+	kills.Name   = "Kills"
+	kills.Value  = 0
+	kills.Parent = statsFolder
 
-	-- ── coins ──
-	local coins = Instance.new("IntValue", player)
-	coins.Name  = "Coins"
-	coins.Value = data.coins
+	local wins = Instance.new("IntValue")
+	wins.Name   = "Wins"
+	wins.Value  = data.wins
+	wins.Parent = player
 
-	-- ── ammo ──
-	local ammo = Instance.new("IntValue", player)
-	ammo.Name  = "Ammo"
-	ammo.Value = 0
+	local lifetimeKills = Instance.new("IntValue")
+	lifetimeKills.Name   = "LifetimeKills"
+	lifetimeKills.Value  = data.lifetimeKills
+	lifetimeKills.Parent = player
 
-	-- ── inventory folder ──
-	local invFolder = Instance.new("Folder", player)
-	invFolder.Name = "Inventory"
+	local coins = Instance.new("IntValue")
+	coins.Name   = "Coins"
+	coins.Value  = data.coins
+	coins.Parent = player
+
+	local ammo = Instance.new("IntValue")
+	ammo.Name   = "Ammo"
+	ammo.Value  = 0
+	ammo.Parent = player
+
+	local invFolder = Instance.new("Folder")
+	invFolder.Name   = "Inventory"
+	invFolder.Parent = player
 	for itemName, owned in pairs(data.inventory) do
 		if owned then
-			local v = Instance.new("BoolValue", invFolder)
-			v.Name  = itemName
-			v.Value = true
+			local v = Instance.new("BoolValue")
+			v.Name   = itemName
+			v.Value  = true
+			v.Parent = invFolder
 		end
 	end
 
-	-- ── equipped values ──
-	local er = Instance.new("StringValue", player)
-	er.Name  = "EquippedRanged"
-	er.Value = data.equippedRanged
+	local er = Instance.new("StringValue")
+	er.Name   = "EquippedRanged"
+	er.Value  = data.equippedRanged
+	er.Parent = player
 
-	local em = Instance.new("StringValue", player)
-	em.Name  = "EquippedMelee"
-	em.Value = data.equippedMelee
+	local em = Instance.new("StringValue")
+	em.Name   = "EquippedMelee"
+	em.Value  = data.equippedMelee
+	em.Parent = player
 end
 
--- when they leave, gather current stats & save
 local function onPlayerRemoving(player)
-	-- build a plain Lua table
 	local out = {}
-	out.coins          = (player:FindFirstChild("Coins")         and player.Coins.Value)         or DEFAULT_DATA.coins
-	out.inventory      = {}
-	out.equippedRanged = (player:FindFirstChild("EquippedRanged") and player.EquippedRanged.Value) or DEFAULT_DATA.equippedRanged
-	out.equippedMelee  = (player:FindFirstChild("EquippedMelee")  and player.EquippedMelee.Value)  or DEFAULT_DATA.equippedMelee
+	out.coins         = (player:FindFirstChild("Coins")         and player.Coins.Value)         or DEFAULT_DATA.coins
+	out.inventory     = {}
+	out.equippedRanged  = (player:FindFirstChild("EquippedRanged") and player.EquippedRanged.Value) or DEFAULT_DATA.equippedRanged
+	out.equippedMelee   = (player:FindFirstChild("EquippedMelee")  and player.EquippedMelee.Value)  or DEFAULT_DATA.equippedMelee
+	out.wins          = (player:FindFirstChild("Wins")           and player.Wins.Value)           or DEFAULT_DATA.wins
+	out.lifetimeKills = (player:FindFirstChild("LifetimeKills")  and player.LifetimeKills.Value)  or DEFAULT_DATA.lifetimeKills
 
 	local invFolder = player:FindFirstChild("Inventory")
 	if invFolder then
