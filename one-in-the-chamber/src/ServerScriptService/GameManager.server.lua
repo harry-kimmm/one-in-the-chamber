@@ -4,6 +4,7 @@ local Players              = game:GetService("Players")
 local RS                   = game:GetService("ReplicatedStorage")
 local DataStoreService     = game:GetService("DataStoreService")
 local ServerScriptService  = game:GetService("ServerScriptService")
+local SoundService         = game:GetService("SoundService")
 
 local KillStreaks  = require(ServerScriptService:WaitForChild("KillStreaks"))
 local AuraService  = require(ServerScriptService:WaitForChild("AuraService"))
@@ -22,19 +23,48 @@ if not firstPlaceEvent then
 	firstPlaceEvent.Parent = remotes
 end
 
+-- Replicated round state for late joiners
+local stateFolder = RS:FindFirstChild("RoundState")
+if not stateFolder then
+	stateFolder = Instance.new("Folder")
+	stateFolder.Name = "RoundState"
+	stateFolder.Parent = RS
+end
+local phaseVal = stateFolder:FindFirstChild("Phase") or Instance.new("StringValue")
+phaseVal.Name = "Phase"
+phaseVal.Value = "None"
+phaseVal.Parent = stateFolder
+
+local mapVal = stateFolder:FindFirstChild("MapName") or Instance.new("StringValue")
+mapVal.Name = "MapName"
+mapVal.Value = ""
+mapVal.Parent = stateFolder
+
 local toolTemplates    = RS:WaitForChild("ToolTemplates")
 local HUB_SPAWNS       = workspace:WaitForChild("Hub"):WaitForChild("SpawnPoints")
 local MAPS_FOLDER      = workspace:WaitForChild("Maps")
 
 local MIN_PLAYERS = 1
-local LOBBY_TIME  = 10
+local LOBBY_TIME  = 1
 local ROUND_TIME  = 10
 local KILL_LIMIT  = 10
 
 local currentPhase     = "None"
 local currentMapSpawns = HUB_SPAWNS
+local currentMapName   = ""
 local lastLeader       = nil
 
+-- ========= Round-end sound helper =========
+local function playRoundEndSound()
+	local s = SoundService:FindFirstChild("RoundEndSound")
+	if s and s:IsA("Sound") then
+		if s.IsPlaying then s:Stop() end
+		s.TimePosition = 0
+		s:Play()
+	end
+end
+
+-- ========= Leaderboard helpers =========
 local function dayKey()
 	local t = os.date("!*t")
 	return string.format("%04d%02d%02d", t.year, t.month, t.day)
@@ -62,18 +92,17 @@ local function incrPeriod(statType, delta, userId)
 	local wk = weekKey()
 	local dayKeyName   = statType .. "_Daily_"  .. dk .. "_" .. tostring(userId)
 	local weekKeyName  = statType .. "_Weekly_" .. wk .. "_" .. tostring(userId)
-	local newDay, newWeek
 
 	local ok1, val1 = pcall(function() return counters:GetAsync(dayKeyName) end)
 	local baseDay = (ok1 and val1) or 0
-	newDay = baseDay + delta
+	local newDay = baseDay + delta
 	pcall(function() counters:SetAsync(dayKeyName, newDay) end)
 	local dayODS = DataStoreService:GetOrderedDataStore(odsName(statType, "Daily"))
 	pcall(function() dayODS:SetAsync(tostring(userId), newDay) end)
 
 	local ok2, val2 = pcall(function() return counters:GetAsync(weekKeyName) end)
 	local baseWeek = (ok2 and val2) or 0
-	newWeek = baseWeek + delta
+	local newWeek = baseWeek + delta
 	pcall(function() counters:SetAsync(weekKeyName, newWeek) end)
 	local weekODS = DataStoreService:GetOrderedDataStore(odsName(statType, "Weekly"))
 	pcall(function() weekODS:SetAsync(tostring(userId), newWeek) end)
@@ -85,6 +114,7 @@ local function setLifetime(statType, absoluteValue, userId)
 	pcall(function() ods:SetAsync(tostring(userId), absoluteValue) end)
 end
 
+-- ========= Utility =========
 local function teleportTo(pl, spawns)
 	local char = pl.Character
 	if not char then return end
@@ -129,14 +159,7 @@ local function onCharacterAdded(char)
 	end
 end
 
-Players.PlayerAdded:Connect(function(pl)
-	pl.CharacterAdded:Connect(onCharacterAdded)
-end)
-for _, pl in ipairs(Players:GetPlayers()) do
-	pl.CharacterAdded:Connect(onCharacterAdded)
-	if pl.Character then onCharacterAdded(pl.Character) end
-end
-
+-- ========= First place / aura leader =========
 local function getKills(pl)
 	local ls = pl:FindFirstChild("leaderstats")
 	local k  = ls and ls:FindFirstChild("Kills")
@@ -170,12 +193,45 @@ local function broadcastLeader(newLeader)
 	end
 end
 
+local function syncClient(pl)
+	if currentPhase == "Round" then
+		evProfileToggle:FireClient(pl, false)
+		evBeginRound:FireClient(pl, currentMapName)
+		local leader = computeUniqueLeader()
+		firstPlaceEvent:FireClient(
+			pl,
+			leader ~= nil and pl == leader,
+			leader and leader.Name or "",
+			leader and getKills(leader) or 0
+		)
+	else
+		evProfileToggle:FireClient(pl, true)
+	end
+end
+
+-- ========= Player hooks =========
+Players.PlayerAdded:Connect(function(pl)
+	pl.CharacterAdded:Connect(onCharacterAdded)
+	task.defer(function() syncClient(pl) end)
+end)
+for _, pl in ipairs(Players:GetPlayers()) do
+	pl.CharacterAdded:Connect(onCharacterAdded)
+	if pl.Character then onCharacterAdded(pl.Character) end
+	task.defer(function() syncClient(pl) end)
+end
+
+-- ========= Phases =========
 local function startLobby()
 	currentPhase     = "Lobby"
 	currentMapSpawns = HUB_SPAWNS
-	lastLeader       = nil
+	currentMapName   = ""
+	phaseVal.Value   = "Lobby"
+	mapVal.Value     = ""
+
+	lastLeader = nil
 	broadcastLeader(nil)
 	evProfileToggle:FireAllClients(true)
+
 	for _, pl in ipairs(Players:GetPlayers()) do
 		if pl.Backpack then
 			for _, t in ipairs(pl.Backpack:GetChildren()) do
@@ -191,6 +247,7 @@ local function startLobby()
 		local ammo = pl:FindFirstChild("Ammo")
 		if ammo then ammo.Value = 0 end
 	end
+
 	for t = LOBBY_TIME, 1, -1 do
 		evLobby:FireAllClients(t)
 		task.wait(1)
@@ -198,18 +255,26 @@ local function startLobby()
 end
 
 local function startRound()
-	currentPhase = "Round"
+	local maps   = MAPS_FOLDER:GetChildren()
+	local chosen = maps[math.random(1, #maps)]
+	currentMapSpawns = chosen:WaitForChild("SpawnPoints")
+	currentMapName   = chosen.Name
+
+	currentPhase   = "Round"
+	phaseVal.Value = "Round"
+	mapVal.Value   = currentMapName
+
 	evProfileToggle:FireAllClients(false)
+
 	for _, pl in ipairs(Players:GetPlayers()) do
 		local ls = pl:FindFirstChild("leaderstats")
 		if ls and ls:FindFirstChild("Kills") then
 			ls.Kills.Value = 0
 		end
 	end
-	local maps  = MAPS_FOLDER:GetChildren()
-	local chosen = maps[math.random(1, #maps)]
-	currentMapSpawns = chosen:WaitForChild("SpawnPoints")
-	evBeginRound:FireAllClients(chosen.Name)
+
+	evBeginRound:FireAllClients(currentMapName)
+
 	for _, pl in ipairs(Players:GetPlayers()) do
 		local ammo = pl:FindFirstChild("Ammo")
 		if ammo then ammo.Value = 1001 end
@@ -220,9 +285,11 @@ local function startRound()
 		giveLoadout(pl)
 		if pl.Character then teleportTo(pl, currentMapSpawns) end
 	end
+
 	AuraService.BeginRound()
 	lastLeader = nil
 	broadcastLeader(computeUniqueLeader())
+
 	local winner
 	for t = ROUND_TIME, 1, -1 do
 		evRound:FireAllClients(t)
@@ -240,6 +307,7 @@ local function startRound()
 	return winner
 end
 
+-- ========= Main loop =========
 task.wait(2)
 while true do
 	if #Players:GetPlayers() >= MIN_PLAYERS then
@@ -258,6 +326,7 @@ while true do
 			if #leaders == 1 then winner = leaders[1].Name end
 		end
 
+		-- Award coins + persist stats
 		for _, pl in ipairs(Players:GetPlayers()) do
 			local coins = pl:FindFirstChild("Coins")
 			if coins then
@@ -284,7 +353,29 @@ while true do
 			end
 		end
 
+		-- NEW: Strip weapons at round end
+		for _, pl in ipairs(Players:GetPlayers()) do
+			if pl.Backpack then
+				for _, t in ipairs(pl.Backpack:GetChildren()) do
+					if t:IsA("Tool") then t:Destroy() end
+				end
+			end
+			if pl.Character then
+				for _, t in ipairs(pl.Character:GetChildren()) do
+					if t:IsA("Tool") then t:Destroy() end
+				end
+			end
+		end
+
+		-- NEW: Play round-end sound
+		playRoundEndSound()
+
+		-- Announce winner(s)
 		evEnd:FireAllClients(winner or "")
+		currentPhase   = "Intermission"
+		phaseVal.Value = "Intermission"
+		mapVal.Value   = ""
+
 		broadcastLeader(nil)
 		for _, pl in ipairs(Players:GetPlayers()) do
 			KillStreaks.Reset(pl)

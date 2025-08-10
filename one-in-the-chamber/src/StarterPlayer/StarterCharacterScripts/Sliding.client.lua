@@ -46,7 +46,7 @@ UIS.InputBegan:Connect(function(input, processed)
 
 		if meleeTool then meleeTool.Enabled = true end
 
-		wait(1)
+		wait(3)
 		ok = true
 	end
 end)

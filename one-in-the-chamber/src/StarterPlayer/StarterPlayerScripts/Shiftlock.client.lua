@@ -1,37 +1,33 @@
--- StarterPlayerScripts/ShiftLockController.lua
-
--- Debug startup
 print("[ShiftLock] Controller loaded")
 
-local Players       = game:GetService("Players")
-local UIS           = game:GetService("UserInputService")
-local RunService    = game:GetService("RunService")
-local RS            = game:GetService("ReplicatedStorage")
+local Players    = game:GetService("Players")
+local UIS        = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local RS         = game:GetService("ReplicatedStorage")
 
-local player        = Players.LocalPlayer
-local remotes       = RS:WaitForChild("GameRemotes")
-local BeginRound    = remotes:WaitForChild("BeginRound")
-local EndRound      = remotes:WaitForChild("EndRound")
-local StartLobby    = remotes:WaitForChild("StartLobby")
+local player     = Players.LocalPlayer
+local remotes    = RS:WaitForChild("GameRemotes")
+local BeginRound = remotes:WaitForChild("BeginRound")
+local EndRound   = remotes:WaitForChild("EndRound")
+local StartLobby = remotes:WaitForChild("StartLobby")
+
+local stateFolder = RS:WaitForChild("RoundState")
+local phaseVal    = stateFolder:WaitForChild("Phase")
 
 local active = false
 
--- Safely unbind any existing ShiftLock binding
 local function clearBinding()
 	pcall(function()
 		RunService:UnbindFromRenderStep("ShiftLock")
 	end)
 end
 
--- Apply shift-lock to the given character
 local function applyShiftLock(char)
 	clearBinding()
 	local hum  = char:WaitForChild("Humanoid")
 	local root = char:WaitForChild("HumanoidRootPart")
-
 	hum.AutoRotate   = false
 	hum.CameraOffset = Vector3.new(1.75, 0, 0)
-
 	RunService:BindToRenderStep("ShiftLock", Enum.RenderPriority.Camera.Value, function()
 		UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
 		local _, y, _ = workspace.CurrentCamera.CFrame:ToEulerAnglesYXZ()
@@ -39,7 +35,6 @@ local function applyShiftLock(char)
 	end)
 end
 
--- Remove shift-lock and restore defaults
 local function removeShiftLock()
 	clearBinding()
 	local char = player.Character
@@ -53,7 +48,6 @@ local function removeShiftLock()
 	UIS.MouseBehavior = Enum.MouseBehavior.Default
 end
 
--- Handle round start
 BeginRound.OnClientEvent:Connect(function()
 	active = true
 	if player.Character then
@@ -61,22 +55,35 @@ BeginRound.OnClientEvent:Connect(function()
 	end
 end)
 
--- Handle round end
 EndRound.OnClientEvent:Connect(function()
 	active = false
 	removeShiftLock()
 end)
 
--- Handle lobby start
 StartLobby.OnClientEvent:Connect(function()
 	active = false
 	removeShiftLock()
 end)
 
--- Reapply on respawn if still in a round
 player.CharacterAdded:Connect(function(char)
 	if active then
 		char:WaitForChild("HumanoidRootPart")
 		task.defer(function() applyShiftLock(char) end)
 	end
 end)
+
+local function syncFromPhase()
+	local shouldBeActive = (phaseVal.Value == "Round")
+	if shouldBeActive and not active then
+		active = true
+		if player.Character then
+			task.defer(function() applyShiftLock(player.Character) end)
+		end
+	elseif not shouldBeActive and active then
+		active = false
+		removeShiftLock()
+	end
+end
+
+syncFromPhase()
+phaseVal.Changed:Connect(syncFromPhase)
