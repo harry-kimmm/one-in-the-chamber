@@ -1,3 +1,4 @@
+-- GameManager (ServerScriptService/GameManager)
 print("[GameManager] loaded")
 
 local Players              = game:GetService("Players")
@@ -45,8 +46,8 @@ local HUB_SPAWNS       = workspace:WaitForChild("Hub"):WaitForChild("SpawnPoints
 local MAPS_FOLDER      = workspace:WaitForChild("Maps")
 
 local MIN_PLAYERS = 1
-local LOBBY_TIME  = 1
-local ROUND_TIME  = 10
+local LOBBY_TIME  = 10
+local ROUND_TIME  = 300
 local KILL_LIMIT  = 10
 
 local currentPhase     = "None"
@@ -143,14 +144,32 @@ local function giveLoadout(pl)
 	end
 end
 
+-- ========= Action gate (disable guns/swords on death or outside rounds) =========
+local function setCanAct(pl, allowed)
+	if pl and pl.Parent then
+		pl:SetAttribute("CanAct", allowed and true or false)
+	end
+end
+
 local function onCharacterAdded(char)
 	local pl  = Players:GetPlayerFromCharacter(char)
 	if not pl then return end
 	local hum = char:WaitForChild("Humanoid")
 	hum.MaxHealth = 100
 	hum.Health    = 100
+
+	-- gate actions based on phase; also gate on death
+	if currentPhase == "Round" then
+		task.delay(0.1, function() setCanAct(pl, true) end)
+	else
+		setCanAct(pl, false)
+	end
+	hum.Died:Connect(function()
+		setCanAct(pl, false)
+	end)
+
 	local ammo = pl:FindFirstChild("Ammo")
-	if ammo then ammo.Value = (currentPhase=="Round") and 1001 or 0 end
+	if ammo then ammo.Value = (currentPhase=="Round") and 1 or 0 end
 	if currentPhase=="Lobby" then
 		teleportTo(pl, HUB_SPAWNS)
 	elseif currentPhase=="Round" then
@@ -211,10 +230,12 @@ end
 
 -- ========= Player hooks =========
 Players.PlayerAdded:Connect(function(pl)
+	setCanAct(pl, false)
 	pl.CharacterAdded:Connect(onCharacterAdded)
 	task.defer(function() syncClient(pl) end)
 end)
 for _, pl in ipairs(Players:GetPlayers()) do
+	setCanAct(pl, currentPhase == "Round")
 	pl.CharacterAdded:Connect(onCharacterAdded)
 	if pl.Character then onCharacterAdded(pl.Character) end
 	task.defer(function() syncClient(pl) end)
@@ -233,6 +254,7 @@ local function startLobby()
 	evProfileToggle:FireAllClients(true)
 
 	for _, pl in ipairs(Players:GetPlayers()) do
+		setCanAct(pl, false)
 		if pl.Backpack then
 			for _, t in ipairs(pl.Backpack:GetChildren()) do
 				if t:IsA("Tool") then t:Destroy() end
@@ -277,7 +299,7 @@ local function startRound()
 
 	for _, pl in ipairs(Players:GetPlayers()) do
 		local ammo = pl:FindFirstChild("Ammo")
-		if ammo then ammo.Value = 1001 end
+		if ammo then ammo.Value = 1 end
 		if pl.Character then
 			local hum = pl.Character:FindFirstChild("Humanoid")
 			if hum then hum.Health = 100 end
@@ -285,6 +307,13 @@ local function startRound()
 		giveLoadout(pl)
 		if pl.Character then teleportTo(pl, currentMapSpawns) end
 	end
+
+	-- enable actions for everyone now that round started
+	task.delay(0.1, function()
+		for _, pl in ipairs(Players:GetPlayers()) do
+			setCanAct(pl, true)
+		end
+	end)
 
 	AuraService.BeginRound()
 	lastLeader = nil
@@ -326,12 +355,11 @@ while true do
 			if #leaders == 1 then winner = leaders[1].Name end
 		end
 
-		-- Award coins + persist stats
 		for _, pl in ipairs(Players:GetPlayers()) do
 			local coins = pl:FindFirstChild("Coins")
 			if coins then
 				if pl.Name == winner then
-					coins.Value += 690000
+					coins.Value += 45
 					local w = pl:FindFirstChild("Wins")
 					if w then
 						w.Value += 1
@@ -353,7 +381,6 @@ while true do
 			end
 		end
 
-		-- NEW: Strip weapons at round end
 		for _, pl in ipairs(Players:GetPlayers()) do
 			if pl.Backpack then
 				for _, t in ipairs(pl.Backpack:GetChildren()) do
@@ -365,12 +392,11 @@ while true do
 					if t:IsA("Tool") then t:Destroy() end
 				end
 			end
+			setCanAct(pl, false)
 		end
 
-		-- NEW: Play round-end sound
 		playRoundEndSound()
 
-		-- Announce winner(s)
 		evEnd:FireAllClients(winner or "")
 		currentPhase   = "Intermission"
 		phaseVal.Value = "Intermission"

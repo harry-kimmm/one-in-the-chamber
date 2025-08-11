@@ -1,0 +1,2 @@
+--some particles are open source so creds to made the orignal particles--
+---100 subs i will release a huge vfx pack(may contain open source models)---

@@ -1,4 +1,4 @@
--- BulletHandler
+-- BulletHandler (ServerScriptService)
 local Players             = game:GetService("Players")
 local RS                  = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -11,12 +11,25 @@ local grantEvent = remotes:WaitForChild("GrantBullet")
 
 local MAX_RANGE = 500
 
-fireEvent.OnServerEvent:Connect(function(player, targetPos)
-	local ammo = player:FindFirstChild("Ammo")
-	if not (ammo and ammo.Value > 0) then
-		return
+local function canAct(player)
+	if player:GetAttribute("CanAct") ~= true then return false end
+	local char = player.Character
+	if not char then return false end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 or hum:GetState() == Enum.HumanoidStateType.Dead then
+		return false
 	end
-	ammo.Value = ammo.Value - 1
+	return true
+end
+
+fireEvent.OnServerEvent:Connect(function(player, targetPos)
+	if not canAct(player) then return end
+
+	local ammo = player:FindFirstChild("Ammo")
+	if not (ammo and ammo.Value > 0) then return end
+
+	-- consume on fire (misses cost a bullet)
+	ammo.Value -= 1
 
 	local char = player.Character
 	if not char then return end
@@ -35,14 +48,18 @@ fireEvent.OnServerEvent:Connect(function(player, targetPos)
 		local victimModel = result.Instance:FindFirstAncestorOfClass("Model")
 		local hum         = victimModel and victimModel:FindFirstChild("Humanoid")
 		local victim      = hum and Players:GetPlayerFromCharacter(victimModel)
-		if victim and hum.Health > 0 and victim ~= player then
+		if victim and hum and hum.Health > 0 and victim ~= player then
+			-- kill
 			hum.Health = 0
 
+			-- stats & coins
 			player.leaderstats.Kills.Value += 1
 			player.Coins.Value             += 3
 
+			-- kill streak
 			KillStreaks.AddKill(player)
 
+			-- refund one bullet on kill
 			ammo.Value += 1
 			grantEvent:FireClient(player)
 		end

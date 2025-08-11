@@ -1,4 +1,3 @@
--- MeleeHandler
 local Players             = game:GetService("Players")
 local RS                  = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -13,13 +12,22 @@ local COOLDOWN   = 1.25
 local KILL_COINS = 3
 local lastSwing  = {}
 
+local function canAct(player)
+	if player:GetAttribute("CanAct") ~= true then return false end
+	local char = player.Character
+	if not char then return false end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 or hum:GetState() == Enum.HumanoidStateType.Dead then
+		return false
+	end
+	return true
+end
+
 meleeAttack.OnServerEvent:Connect(function(attacker, regionCFrame, regionSize)
-	if not attacker or not attacker.Character then return end
+	if not canAct(attacker) then return end
 
 	local now = tick()
-	if lastSwing[attacker] and now - lastSwing[attacker] < COOLDOWN then
-		return
-	end
+	if lastSwing[attacker] and now - lastSwing[attacker] < COOLDOWN then return end
 	lastSwing[attacker] = now
 
 	local parts      = workspace:GetPartBoundsInBox(regionCFrame, regionSize)
@@ -31,7 +39,6 @@ meleeAttack.OnServerEvent:Connect(function(attacker, regionCFrame, regionSize)
 		local hum    = model and model:FindFirstChild("Humanoid")
 		if victim and hum and hum.Health > 0 and victim ~= attacker and not hitPlayers[victim] then
 			hitPlayers[victim] = true
-
 			hum.Health = 0
 
 			local stats = attacker:FindFirstChild("leaderstats")

@@ -7,7 +7,7 @@ function SpeedController.new(humanoid, baseSpeed, sprintMult, swordMult)
 	self.hum = humanoid
 	self.baseSpeed = baseSpeed
 	self.sprintMult = sprintMult or 1.5
-	self.swordMult = swordMult or 1.1
+	self.swordMult = swordMult or 1.5
 	self.isSprint = false
 	self.isSword = false
 	self:Update()

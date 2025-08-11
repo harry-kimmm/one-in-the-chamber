@@ -2,8 +2,10 @@ local tool = script.Parent
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 local ContentProvider = game:GetService("ContentProvider")
+
 local remotes = RS:WaitForChild("GameRemotes")
 local meleeAttack = remotes:WaitForChild("MeleeAttack")
+
 local player = Players.LocalPlayer
 local swings = {
 	tool:WaitForChild("Swing1"),
@@ -12,9 +14,9 @@ local swings = {
 }
 local swingSound = tool:FindFirstChild("SwingSound")
 local equipAnim = tool:WaitForChild("EquipAnimation")
+
 local EQUIP_DELAY = 0.3
-local COOLDOWN = 0.3
-local HIT_DELAY = 0.3
+local COOLDOWN = 0.5
 local BOX_DISTANCE = -5
 local BOX_SIZE = Vector3.new(5,5,6)
 
@@ -59,7 +61,7 @@ tool.Equipped:Connect(function()
 	canAttack = false
 	equipTrack:Play()
 	speedCtrl:SetSword(true)
-	delay(EQUIP_DELAY, function() canAttack = true end)
+	task.delay(EQUIP_DELAY, function() canAttack = true end)
 end)
 
 tool.Unequipped:Connect(function()
@@ -69,31 +71,31 @@ tool.Unequipped:Connect(function()
 		if t.IsPlaying then t:Stop(0) end
 	end
 	speedCtrl:SetSword(false)
-	humanoid:SetAttribute("BlockSprint", false)
+	if humanoid then humanoid:SetAttribute("BlockSprint", false) end
 end)
 
 tool.Activated:Connect(function()
-	if not canAttack then return end
+	if not canAttack or not humanoid then return end
 	canAttack = false
-	speedCtrl:SetSprint(false)
+	if speedCtrl then speedCtrl:SetSprint(false) end
 	humanoid:SetAttribute("BlockSprint", true)
+
 	local char = player.Character
-	if char then
-		local hrp = char:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			meleeAttack:FireServer(hrp.CFrame * CFrame.new(0,0,BOX_DISTANCE), BOX_SIZE)
-		end
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		local regionCFrame = hrp.CFrame * CFrame.new(0,0,BOX_DISTANCE)
+		meleeAttack:FireServer(regionCFrame, BOX_SIZE)
 	end
+
 	local track = swingTracks[nextIndex]
 	if track then
-		track:Play(0.1,1,2)
+		track:Play(0.1, 1, 2)
 		if swingSound then swingSound:Play() end
 	end
 	nextIndex = (nextIndex % #swingTracks) + 1
-	task.spawn(function()
-		task.wait(HIT_DELAY)
-		task.wait(COOLDOWN)
-		humanoid:SetAttribute("BlockSprint", false)
+
+	task.delay(COOLDOWN, function()
+		if humanoid then humanoid:SetAttribute("BlockSprint", false) end
 		canAttack = true
 	end)
 end)
