@@ -46,9 +46,9 @@ local HUB_SPAWNS       = workspace:WaitForChild("Hub"):WaitForChild("SpawnPoints
 local MAPS_FOLDER      = workspace:WaitForChild("Maps")
 
 local MIN_PLAYERS = 1
-local LOBBY_TIME  = 1
+local LOBBY_TIME  = 45
 local ROUND_TIME  = 300
-local KILL_LIMIT  = 10
+local KILL_LIMIT  = 25
 
 local currentPhase     = "None"
 local currentMapSpawns = HUB_SPAWNS
